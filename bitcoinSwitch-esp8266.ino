@@ -2,23 +2,17 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
-
-//fs::SPIFFSFS &FlashFS = SPIFFS;
-#define FORMAT_ON_FAIL true
 #include "qrcode.h"
-
-#include <ArduinoJson.h>
-
 #include <WebSocketsClient.h>
-
+#include <ArduinoJson.h>
 #define PARAM_FILE "/elements.json"
 
 /////////////////////////////////
 ///////////CHANGE////////////////
 /////////////////////////////////
 
-bool usingM5 = true; // false if not using M5Stack          
-int portalPin = 4;
+bool usingLCD = true; // false if not using LCD
+// int portalPin = 4;
 
 const int QR_X_OFFSET = 20;
 const int QR_Y_OFFSET = 3;
@@ -47,7 +41,6 @@ int balance;
 int oldBalance;
 
 bool paid;
-bool down = false;
 bool triggerUSB = false; 
 
 TFT_eSPI tft = TFT_eSPI();
@@ -70,7 +63,7 @@ void logoScreen()
 void setup()
 {
   Serial.begin(115200);
-  if(usingM5 == true){
+  if(usingLCD == true){
     tft.init();
     tft.setRotation(1);
     tft.invertDisplay(false);
@@ -115,7 +108,7 @@ void setup()
 
 void loop() {
   while(WiFi.status() != WL_CONNECTED){
-    if(usingM5 == true){
+    if(usingLCD == true){
       connectionError();
     }
     Serial.println("Failed to connect");
@@ -123,7 +116,7 @@ void loop() {
   }
 //  Serial.println(highPin.toInt());
 
-  if((lnurl != "true") and (usingM5 == true)){
+  if((lnurl != "true") and (usingLCD == true)){
       qrdisplayScreen();
   }
   paid = false;
@@ -135,14 +128,14 @@ void loop() {
       Serial.println(highPin);
       timePin = getValue(payloadStr, '-', 1);
       Serial.println(timePin);
-      if(usingM5 == true){
+      if(usingLCD == true){
         completeScreen();
       }
       onOff();
     }
   }
   Serial.println("Paid");
-  if(usingM5 == true){
+  if(usingLCD == true){
     paidScreen();
   }
 
@@ -347,99 +340,7 @@ void qrdisplayScreen()
   }
 }
 
-//////////////////NODE CALLS///////////////////
-
-void checkConnection(){
-  WiFiClientSecure client;
-  client.setInsecure();
-  const char* lnbitsserver = lnbitsServer.c_str();
-  if (!client.connect(lnbitsserver, 443)){
-    down = true;
-    serverError();
-    return;   
-  }
-}
-
-void getInvoice(){
-  WiFiClientSecure client;
-  client.setInsecure();
-  const char* lnbitsserver = lnbitsServer.c_str();
-  if (!client.connect(lnbitsserver, 443)){
-    down = true;
-    return;   
-  }
-  StaticJsonDocument<500> doc;
-  DeserializationError error;
-  char c;
-  String line;
-  String url = "/lnurldevice/api/v1/lnurl/";
-  client.print(String("GET ") + url + deviceId +" HTTP/1.1\r\n" +
-                "Host: " + lnbitsserver + "\r\n" +
-                "User-Agent: ESP32\r\n" +
-                "Content-Type: application/json\r\n" +
-                "Connection: close\r\n\r\n");
-  while (client.connected()) {
-    line = client.readStringUntil('\n');
-    if (line == "\r") {
-      break;
-    }
-  }
-  String callback;
-  while (client.available()) {
-    line = client.readStringUntil('\n');
-    callback = line;
-  }
-  Serial.println(callback);
-  delay(500);
-  error = deserializeJson(doc, callback);
-  if (error) {
-    Serial.print(F("deserializeJson() failed: "));
-    Serial.println(error.f_str());
-    return;
-  }
-  const char* callbackChar = doc["callback"];
-  String callbackStr = callbackChar;
-  getCallback(callbackStr);
-}
-
-void getCallback(String callbackStr){
-  WiFiClientSecure client;
-  client.setInsecure();
-  const char* lnbitsserver = lnbitsServer.c_str();
-  if (!client.connect(lnbitsserver, 443)){
-    down = true;
-    return;   
-  }
-  StaticJsonDocument<500> doc;
-  DeserializationError error;
-  char c;
-  String line;
-  client.print(String("GET ") + callbackStr.substring(8 + lnbitsServer.length()) +" HTTP/1.1\r\n" +
-                "Host: " + lnbitsserver + "\r\n" +
-                "User-Agent: ESP32\r\n" +
-                "Content-Type: application/json\r\n" +
-                "Connection: close\r\n\r\n");
-   while (client.connected()) {
-   String line = client.readStringUntil('\n');
-   Serial.println(line);
-    if (line == "\r") {
-      break;
-    }
-  }
-  line = client.readString();
-  Serial.println(line);
-  error = deserializeJson(doc, line);
-  if (error) {
-    Serial.print(F("deserializeJson() failed: "));
-    Serial.println(error.f_str());
-    return;
-  }
-  const char* temp = doc["pr"];
-  payReq = temp;
-}
 //////////////////WEBSOCKET///////////////////
-
-
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_DISCONNECTED:
@@ -447,23 +348,18 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             break;
         case WStype_CONNECTED:
             {
-                Serial.printf("[WSc] Connected to url: %s\n",  payload);
-                
-
-			    // send message to server when Connected
-				webSocket.sendTXT("Connected");
+            Serial.printf("[WSc] Connected to url: %s\n",  payload);
+			      webSocket.sendTXT("Connected");
             }
             break;
         case WStype_TEXT:
             payloadStr = (char*)payload;
             paid = true;
-            
-		case WStype_ERROR:			
-		case WStype_FRAGMENT_TEXT_START:
-		case WStype_FRAGMENT_BIN_START:
-		case WStype_FRAGMENT:
-		case WStype_FRAGMENT_FIN:
-			break;
+    		case WStype_ERROR:			
+    		case WStype_FRAGMENT_TEXT_START:
+    		case WStype_FRAGMENT_BIN_START:
+    		case WStype_FRAGMENT:
+    		case WStype_FRAGMENT_FIN:
+    			break;
     }
-
 }
