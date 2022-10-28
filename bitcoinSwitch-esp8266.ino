@@ -1,22 +1,26 @@
+//#define USELCD            //comment this line out to disable LCD
+#define PARAM_FILE "/elements.json"
+
 #include <FS.h>
-#include <SPI.h>
-#include <TFT_eSPI.h>     // https://github.com/Bodmer/TFT_eSPI
 #include <ESP8266WiFi.h>
-#include "qrcode.h"       // https://github.com/ricmoo/qrcode/
 #include <WebSocketsClient.h> // https://github.com/Links2004/arduinoWebSockets
 #include <ArduinoJson.h>  // https://arduinojson.org/?utm_source=meta&utm_medium=library.properties
-#define PARAM_FILE "/elements.json"
+
+#ifdef USELCD
+  #include <SPI.h>
+  #include <TFT_eSPI.h>     // https://github.com/Bodmer/TFT_eSPI
+  #include "qrcode.h"       // https://github.com/ricmoo/qrcode/
+#endif
 
 /////////////////////////////////
 ///////////CHANGE////////////////
 /////////////////////////////////
 
-bool usingLCD = true; // false if not using LCD
-// int portalPin = 4;
-
+#ifdef USELCD
 const int QR_X_OFFSET = 20;
 const int QR_Y_OFFSET = 3;
 const int QR_DOT_SIZE = 2;
+#endif
 
 /////////////////////////////////
 /////////////////////////////////
@@ -42,11 +46,14 @@ int oldBalance;
 
 static const uint16_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnec interval
 
-bool paid;
-bool triggerUSB = false; 
-bool showqr = false; 
+bool paid = false;
+bool triggerUSB = false;
 
-TFT_eSPI tft = TFT_eSPI();
+#ifdef USELCD 
+  bool showqr = false;
+  TFT_eSPI tft = TFT_eSPI();
+#endif
+
 WebSocketsClient webSocket;
 
 struct KeyValue {
@@ -54,25 +61,29 @@ struct KeyValue {
   String value;
 };
 
-void logoScreen()
-{ 
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(0, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_PURPLE);
-  tft.println("bitcoinSwitch");
-}
+#ifdef USELCD
+  void logoScreen()
+  { 
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(0, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_PURPLE);
+    tft.println("bitcoinSwitch");
+  }
+#endif
 
 void setup()
 {
   Serial.begin(115200);
-  if(usingLCD == true){
+  
+  #ifdef USELCD
     tft.init();
     tft.setRotation(1);
     tft.invertDisplay(false);
     logoScreen();
-  }
+  #endif
 
+  //turn off onboard led (gpio 2)
   pinMode (2, OUTPUT);
   digitalWrite(2, HIGH);
 
@@ -105,10 +116,10 @@ void setup()
     configOverSerialPort();
   }
 
-  lnbitsScreen();
-  delay(1000);
-
-  paid = false;
+  #ifdef USELCD
+    lnbitsScreen();
+    delay(1000);
+  #endif
 
   Serial.println(lnbitsServer + "/lnurldevice/ws/" + deviceId);
   webSocket.beginSSL(lnbitsServer.c_str(), 443, ("/lnurldevice/ws/" + deviceId).c_str());
@@ -118,38 +129,40 @@ void setup()
 
 void loop() {
   while(WiFi.status() != WL_CONNECTED){
-    if(usingLCD == true){
+    #ifdef USELCD
       connectionError();
-    }
+    #endif
     Serial.println("Failed to connect");
     delay(500);
   }
 
-  if((lnurl != "true") and (usingLCD == true) and (showqr == true)){
-      qrdisplayScreen();
-      showqr = false;
-  }
-  
-    webSocket.loop();
-    
-    if(paid){
-      paid = false;
-      Serial.println("Paid");
-      Serial.println(payloadStr);
-      highPin = getValue(payloadStr, '-', 0);
-      Serial.println(highPin);
-      timePin = getValue(payloadStr, '-', 1);
-      Serial.println(timePin);
-      if(usingLCD == true){
-        paidScreen();
-      }
-      onOff();
-      if(usingLCD == true){
-        completeScreen();
-        delay(2000);
-        showqr = true;
-      }
+  #ifdef USELCD
+    if((lnurl != "true") and (showqr == true)){
+        qrdisplayScreen();
+        showqr = false;
     }
+  #endif
+  
+  webSocket.loop();
+    
+  if(paid){
+    paid = false;
+    Serial.println("Paid");
+    Serial.println(payloadStr);
+    highPin = getValue(payloadStr, '-', 0);
+    Serial.println(highPin);
+    timePin = getValue(payloadStr, '-', 1);
+    Serial.println(timePin);
+    #ifdef USELCD
+      paidScreen();
+    #endif
+    onOff();
+    #ifdef USELCD
+      completeScreen();
+      delay(2000);
+      showqr = true;
+    #endif
+  }
     
 }
 
@@ -162,13 +175,13 @@ void onOff()
     digitalWrite(highPin.toInt(), LOW);
     delay(timePin.toInt());
     digitalWrite(highPin.toInt(), HIGH); 
-    delay(2000);
+    //delay(2000);
   }
   else{
     digitalWrite(highPin.toInt(), HIGH);
     delay(timePin.toInt());
     digitalWrite(highPin.toInt(), LOW); 
-    delay(2000);
+    //delay(2000);
   }
 }
 
@@ -226,131 +239,131 @@ void readFiles()
 }
 
 //////////////////DISPLAY///////////////////
-
-void serverError()
-{
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(0, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_RED);
-  tft.println("Server connect fail");
-}
-
-void connectionError()
-{
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(0, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_RED);
-  tft.println("Wifi connect fail");
-}
-
-void connection()
-{
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(0, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_RED);
-  tft.println("Wifi connected");
-}
-
-
-
-void portalLaunched()
-{ 
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(0, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_PURPLE);
-  tft.println("PORTAL LAUNCH");
-}
-
-void processingScreen()
-{ 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(40, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE);
-  tft.println("PROCESSING");
-}
-
-void lnbitsScreen()
-{ 
-  tft.fillScreen(TFT_WHITE);
-  tft.setCursor(10, 90);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_BLACK);
-  tft.println("POWERED BY LNBITS");
-}
-
-void portalScreen()
-{ 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(30, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE);
-  tft.println("PORTAL LAUNCHED");
-}
-
-void paidScreen()
-{ 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(110, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE);
-  tft.println("PAID");
-}
-
-void completeScreen()
-{ 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(60, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE);
-  tft.println("COMPLETE");
-}
-
-void errorScreen()
-{ 
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(70, 80);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE);
-  tft.println("ERROR");
-}
-
-void qrdisplayScreen()
-{
-  String qrCodeData;
-  if(lnurl != "true"){
-    qrCodeData = lnurl;
-  }
-  else{
-    qrCodeData = payReq;
-  }
-  tft.fillScreen(TFT_WHITE);
-  qrCodeData.toUpperCase();
-  const char *qrDataChar = qrCodeData.c_str();
-  QRCode qrcoded;
-  uint8_t qrcodeData[qrcode_getBufferSize(10)];
-  qrcode_initText(&qrcoded, qrcodeData, 10, 0, qrDataChar);
-  for (uint8_t y = 0; y < qrcoded.size; y++)
+#ifdef USELCD
+  void serverError()
   {
-    // Each horizontal module
-    for (uint8_t x = 0; x < qrcoded.size; x++)
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(0, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_RED);
+    tft.println("Server connect fail");
+  }
+  
+  void connectionError()
+  {
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(0, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_RED);
+    tft.println("Wifi connect fail");
+  }
+  
+  void connection()
+  {
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(0, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_RED);
+    tft.println("Wifi connected");
+  }
+  
+  
+  
+  void portalLaunched()
+  { 
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(0, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_PURPLE);
+    tft.println("PORTAL LAUNCH");
+  }
+  
+  void processingScreen()
+  { 
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(40, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("PROCESSING");
+  }
+  
+  void lnbitsScreen()
+  { 
+    tft.fillScreen(TFT_WHITE);
+    tft.setCursor(10, 90);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_BLACK);
+    tft.println("POWERED BY LNBITS");
+  }
+  
+  void portalScreen()
+  { 
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(30, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("PORTAL LAUNCHED");
+  }
+  
+  void paidScreen()
+  { 
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(110, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("PAID");
+  }
+  
+  void completeScreen()
+  { 
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(60, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("COMPLETE");
+  }
+  
+  void errorScreen()
+  { 
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(70, 80);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("ERROR");
+  }
+  
+  void qrdisplayScreen()
+  {
+    String qrCodeData;
+    if(lnurl != "true"){
+      qrCodeData = lnurl;
+    }
+    else{
+      qrCodeData = payReq;
+    }
+    tft.fillScreen(TFT_WHITE);
+    qrCodeData.toUpperCase();
+    const char *qrDataChar = qrCodeData.c_str();
+    QRCode qrcoded;
+    uint8_t qrcodeData[qrcode_getBufferSize(10)];
+    qrcode_initText(&qrcoded, qrcodeData, 10, 0, qrDataChar);
+    for (uint8_t y = 0; y < qrcoded.size; y++)
     {
-      if (qrcode_getModule(&qrcoded, x, y))
+      // Each horizontal module
+      for (uint8_t x = 0; x < qrcoded.size; x++)
       {
-        tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_BLACK);
-      }
-      else
-      {
-        tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_WHITE);
+        if (qrcode_getModule(&qrcoded, x, y))
+        {
+          tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_BLACK);
+        }
+        else
+        {
+          tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_WHITE);
+        }
       }
     }
   }
-}
-
+#endif  
 //////////////////WEBSOCKET///////////////////
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
@@ -361,7 +374,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             {
             Serial.printf("[WSc] Connected to url: %s\n",  payload);
 			      webSocket.sendTXT("Connected");
-            showqr = true;
+            #ifdef USELCD
+              showqr = true;
+            #endif  
             }
             break;
         case WStype_TEXT:
