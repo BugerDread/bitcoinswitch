@@ -1,4 +1,4 @@
-//#define USELCD            //comment this line out to disable LCD
+#define USELCD            //comment this line out to disable LCD
 #define PARAM_FILE "/elements.json"
 
 #include <FS.h>
@@ -61,24 +61,13 @@ struct KeyValue {
   String value;
 };
 
-#ifdef USELCD
-  void logoScreen()
-  { 
-    tft.fillScreen(TFT_WHITE);
-    tft.setCursor(0, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_PURPLE);
-    tft.println("bitcoinSwitch");
-  }
-#endif
-
 void setup()
 {
   Serial.begin(115200);
   
   #ifdef USELCD
     tft.init();
-    tft.setRotation(1);
+    tft.setRotation(3);
     tft.invertDisplay(false);
     logoScreen();
   #endif
@@ -115,11 +104,6 @@ void setup()
     Serial.println("USB triggered");
     configOverSerialPort();
   }
-
-  #ifdef USELCD
-    lnbitsScreen();
-    delay(1000);
-  #endif
 
   Serial.println(lnbitsServer + "/lnurldevice/ws/" + deviceId);
   webSocket.beginSSL(lnbitsServer.c_str(), 443, ("/lnurldevice/ws/" + deviceId).c_str());
@@ -163,7 +147,6 @@ void loop() {
       showqr = true;
     #endif
   }
-    
 }
 
 //////////////////HELPERS///////////////////
@@ -240,15 +223,31 @@ void readFiles()
 
 //////////////////DISPLAY///////////////////
 #ifdef USELCD
-  void serverError()
-  {
+  void logoScreen()
+  { 
     tft.fillScreen(TFT_WHITE);
-    tft.setCursor(0, 80);
+    tft.setCursor(3, 40);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_PURPLE);
+    tft.println("bitcoinSwitch");
     tft.setTextSize(1);
-    tft.setTextColor(TFT_RED);
-    tft.println("Server connect fail");
+    tft.setTextColor(TFT_BLACK);
+    tft.setCursor(36, 64);
+    tft.println("ESP8266 version");
+    delay(1000);
+    tft.setCursor(30, 80);
+    tft.println("POWERED BY LNBITS");
   }
   
+//  void serverError()
+//  {
+//    tft.fillScreen(TFT_WHITE);
+//    tft.setCursor(0, 80);
+//    tft.setTextSize(1);
+//    tft.setTextColor(TFT_RED);
+//    tft.println("Server connect fail");
+//  }
+//  
   void connectionError()
   {
     tft.fillScreen(TFT_WHITE);
@@ -257,59 +256,21 @@ void readFiles()
     tft.setTextColor(TFT_RED);
     tft.println("Wifi connect fail");
   }
-  
-  void connection()
-  {
-    tft.fillScreen(TFT_WHITE);
-    tft.setCursor(0, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_RED);
-    tft.println("Wifi connected");
-  }
-  
-  
-  
-  void portalLaunched()
-  { 
-    tft.fillScreen(TFT_WHITE);
-    tft.setCursor(0, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_PURPLE);
-    tft.println("PORTAL LAUNCH");
-  }
-  
-  void processingScreen()
-  { 
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(40, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE);
-    tft.println("PROCESSING");
-  }
-  
-  void lnbitsScreen()
-  { 
-    tft.fillScreen(TFT_WHITE);
-    tft.setCursor(10, 90);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_BLACK);
-    tft.println("POWERED BY LNBITS");
-  }
-  
-  void portalScreen()
-  { 
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(30, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE);
-    tft.println("PORTAL LAUNCHED");
-  }
+//  
+//  void connection()
+//  {
+//    tft.fillScreen(TFT_WHITE);
+//    tft.setCursor(0, 80);
+//    tft.setTextSize(1);
+//    tft.setTextColor(TFT_RED);
+//    tft.println("Wifi connected");
+//  }
   
   void paidScreen()
   { 
     tft.fillScreen(TFT_BLACK);
-    tft.setCursor(110, 80);
-    tft.setTextSize(1);
+    tft.setCursor(60, 60);
+    tft.setTextSize(2);
     tft.setTextColor(TFT_WHITE);
     tft.println("PAID");
   }
@@ -317,19 +278,10 @@ void readFiles()
   void completeScreen()
   { 
     tft.fillScreen(TFT_BLACK);
-    tft.setCursor(60, 80);
-    tft.setTextSize(1);
+    tft.setCursor(30, 60);
+    tft.setTextSize(2);
     tft.setTextColor(TFT_WHITE);
     tft.println("COMPLETE");
-  }
-  
-  void errorScreen()
-  { 
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(70, 80);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE);
-    tft.println("ERROR");
   }
   
   void qrdisplayScreen()
@@ -345,8 +297,8 @@ void readFiles()
     qrCodeData.toUpperCase();
     const char *qrDataChar = qrCodeData.c_str();
     QRCode qrcoded;
-    uint8_t qrcodeData[qrcode_getBufferSize(10)];
-    qrcode_initText(&qrcoded, qrcodeData, 10, 0, qrDataChar);
+    uint8_t qrcodeData[qrcode_getBufferSize(11)];
+    qrcode_initText(&qrcoded, qrcodeData, 11, 0, qrDataChar);
     for (uint8_t y = 0; y < qrcoded.size; y++)
     {
       // Each horizontal module
