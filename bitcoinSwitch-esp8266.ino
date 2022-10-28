@@ -40,8 +40,11 @@ String payReq;
 int balance;
 int oldBalance;
 
+static const uint16_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnec interval
+
 bool paid;
 bool triggerUSB = false; 
+bool showqr = false; 
 
 TFT_eSPI tft = TFT_eSPI();
 WebSocketsClient webSocket;
@@ -69,7 +72,7 @@ void setup()
     tft.invertDisplay(false);
     logoScreen();
   }
-  int timer = 0;
+
   pinMode (2, OUTPUT);
   digitalWrite(2, HIGH);
 
@@ -80,8 +83,13 @@ void setup()
 
   // get the saved details and store in global variables
   readFiles();
-  
+
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   WiFi.begin((char*)ssid.c_str(), (char*)wifiPassword.c_str());
+
+  int timer = 0;  
   while (WiFi.status() != WL_CONNECTED && timer < 8000) {
     delay(1000);
     Serial.print(".");
@@ -99,11 +107,13 @@ void setup()
 
   lnbitsScreen();
   delay(1000);
-  pinMode(highPin.toInt(), OUTPUT);
-  onOff();
+
+  paid = false;
+
   Serial.println(lnbitsServer + "/lnurldevice/ws/" + deviceId);
   webSocket.beginSSL(lnbitsServer.c_str(), 443, ("/lnurldevice/ws/" + deviceId).c_str());
   webSocket.onEvent(webSocketEvent);
+  webSocket.setReconnectInterval(WS_RECONNECT_INTERVAL);
 }
 
 void loop() {
@@ -114,32 +124,33 @@ void loop() {
     Serial.println("Failed to connect");
     delay(500);
   }
-//  Serial.println(highPin.toInt());
 
-  if((lnurl != "true") and (usingLCD == true)){
+  if((lnurl != "true") and (usingLCD == true) and (showqr == true)){
       qrdisplayScreen();
+      showqr = false;
   }
-  paid = false;
-  while(paid == false){
+  
     webSocket.loop();
+    
     if(paid){
+      paid = false;
+      Serial.println("Paid");
       Serial.println(payloadStr);
       highPin = getValue(payloadStr, '-', 0);
       Serial.println(highPin);
       timePin = getValue(payloadStr, '-', 1);
       Serial.println(timePin);
       if(usingLCD == true){
-        completeScreen();
+        paidScreen();
       }
       onOff();
+      if(usingLCD == true){
+        completeScreen();
+        delay(2000);
+        showqr = true;
+      }
     }
-  }
-  Serial.println("Paid");
-  if(usingLCD == true){
-    paidScreen();
-  }
-
-  delay(2000);
+    
 }
 
 //////////////////HELPERS///////////////////
@@ -350,6 +361,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             {
             Serial.printf("[WSc] Connected to url: %s\n",  payload);
 			      webSocket.sendTXT("Connected");
+            showqr = true;
             }
             break;
         case WStype_TEXT:
