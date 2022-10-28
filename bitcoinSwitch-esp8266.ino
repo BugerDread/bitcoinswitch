@@ -1,10 +1,10 @@
 #include <FS.h>
 #include <SPI.h>
-#include <TFT_eSPI.h>
+#include <TFT_eSPI.h>     // https://github.com/Bodmer/TFT_eSPI
 #include <ESP8266WiFi.h>
-#include "qrcode.h"
-#include <WebSocketsClient.h>
-#include <ArduinoJson.h>
+#include "qrcode.h"       // https://github.com/ricmoo/qrcode/
+#include <WebSocketsClient.h> // https://github.com/Links2004/arduinoWebSockets
+#include <ArduinoJson.h>  // https://arduinojson.org/?utm_source=meta&utm_medium=library.properties
 #define PARAM_FILE "/elements.json"
 
 /////////////////////////////////
