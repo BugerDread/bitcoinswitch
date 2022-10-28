@@ -1,12 +1,10 @@
 #include <FS.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
-#include <Wire.h>
 #include <ESP8266WiFi.h>
 
 //fs::SPIFFSFS &FlashFS = SPIFFS;
 #define FORMAT_ON_FAIL true
-#include <JC_Button.h>
 #include "qrcode.h"
 
 #include <ArduinoJson.h>
@@ -72,42 +70,15 @@ void logoScreen()
 void setup()
 {
   Serial.begin(115200);
-  Wire.begin();
   if(usingM5 == true){
     tft.init();
     tft.setRotation(1);
     tft.invertDisplay(false);
     logoScreen();
   }
-  const byte BUTTON_PIN_A = 39;
-  Button BTNA(BUTTON_PIN_A);
-  BTNA.begin();
   int timer = 0;
   pinMode (2, OUTPUT);
-
-  while (timer < 2000)
-  {
-    digitalWrite(2, LOW);
-//    if (usingM5 == true){
-//      if (BTNA.read() == 1){
-//        Serial.println("Launch portal");
-//        triggerUSB = true;
-//        timer = 5000;
-//      }
-//    }
-//    else{
-//      Serial.println(touchRead(portalPin));
-//      if(touchRead(portalPin) < 60){
-//        Serial.println("Launch portal");
-//        triggerUSB = true;
-//        timer = 5000;
-//      }
-//    }
-    digitalWrite(2, HIGH);
-    timer = timer + 100;
-    delay(300);
-  }
-  timer = 0;
+  digitalWrite(2, HIGH);
 
   SPIFFSConfig cfg;
   cfg.setAutoFormat(true);
@@ -116,8 +87,6 @@ void setup()
 
   // get the saved details and store in global variables
   readFiles();
-
-  delay(2000);
   
   WiFi.begin((char*)ssid.c_str(), (char*)wifiPassword.c_str());
   while (WiFi.status() != WL_CONNECTED && timer < 8000) {
@@ -152,64 +121,32 @@ void loop() {
     Serial.println("Failed to connect");
     delay(500);
   }
-  Serial.println(highPin.toInt());
+//  Serial.println(highPin.toInt());
 
-  if(lnurl != "true"){
-    if(usingM5 == true){
+  if((lnurl != "true") and (usingM5 == true)){
       qrdisplayScreen();
-    }
-    paid = false;
-    while(paid == false){
-      webSocket.loop();
-      if(paid){
-        Serial.println(payloadStr);
-        highPin = getValue(payloadStr, '-', 0);
-        Serial.println(highPin);
-        timePin = getValue(payloadStr, '-', 1);
-        Serial.println(timePin);
-        if(usingM5 == true){
-          completeScreen();
-        }
-        onOff();
-      }
-    }
-    Serial.println("Paid");
-    if(usingM5 == true){
-      paidScreen();
-    }
   }
-  else{
-    getInvoice();
-    if(down){
-      errorScreen();
-      getInvoice();
-      delay(5000);
-    }
-    if(payReq != ""){
+  paid = false;
+  while(paid == false){
+    webSocket.loop();
+    if(paid){
+      Serial.println(payloadStr);
+      highPin = getValue(payloadStr, '-', 0);
+      Serial.println(highPin);
+      timePin = getValue(payloadStr, '-', 1);
+      Serial.println(timePin);
       if(usingM5 == true){
-        qrdisplayScreen();
+        completeScreen();
       }
-      delay(5000);
+      onOff();
     }
-    while(paid == false && payReq != ""){
-      webSocket.loop();
-      if(paid){
-        Serial.println(payloadStr);
-        highPin = getValue(payloadStr, '-', 0);
-        Serial.println(highPin);
-        timePin = getValue(payloadStr, '-', 1);
-        Serial.println(timePin);
-        if(usingM5 == true){
-          completeScreen();
-        }
-        onOff();
-      }
-    }
-    payReq = "";
-    dataId = "";
-    paid = false;
-    delay(4000);
   }
+  Serial.println("Paid");
+  if(usingM5 == true){
+    paidScreen();
+  }
+
+  delay(2000);
 }
 
 //////////////////HELPERS///////////////////
