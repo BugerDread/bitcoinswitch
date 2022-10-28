@@ -48,9 +48,9 @@ void removeFile(String path) {
 
 void appendToFile(String path, String data) {
   Serial.println("appendToFile: " + path);
-  File file = SPIFFS.open("/" + path, FILE_APPEND);
+  File file = SPIFFS.open("/" + path, "a");
   if (!file) {
-    file = SPIFFS.open("/" + path, FILE_WRITE);
+    file = SPIFFS.open("/" + path, "w");
   }
   if (file) {
     file.println(data);
@@ -60,7 +60,7 @@ void appendToFile(String path, String data) {
 
 void readFile(String path) {
   Serial.println("readFile: " + path);
-  File file = SPIFFS.open("/" + path);
+  File file = SPIFFS.open("/" + path, "r");
   if (file) {
     while (file.available()) {
       String line = file.readStringUntil('\n');
