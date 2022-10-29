@@ -64,6 +64,7 @@ struct KeyValue {
 void setup()
 {
   Serial.begin(115200);
+  Serial.println(F("\n\nBOOT!"));
   
   #ifdef USELCD
     tft.init();
@@ -72,9 +73,9 @@ void setup()
     logoScreen();
   #endif
 
-  //turn off onboard led (gpio 2)
-  pinMode (2, OUTPUT);
-  digitalWrite(2, HIGH);
+  //turn off onboard led (usually gpio 2)
+  pinMode (LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
 
   SPIFFSConfig cfg;
   cfg.setAutoFormat(true);
@@ -116,7 +117,7 @@ void setup()
     Serial.print(WS_HB_PONG_WITHIN);
     Serial.print(F("ms, "));
     Serial.print(WS_HB_PONGS_MISSED);
-    Serial.print(F(" missed pongs to reconnect."));
+    Serial.println(F(" missed pongs to reconnect."));
     webSocket.enableHeartbeat(WS_HB_PING_TIME, WS_HB_PONG_WITHIN, WS_HB_PONGS_MISSED);
   }
 }
