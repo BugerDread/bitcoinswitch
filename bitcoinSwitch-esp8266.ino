@@ -17,16 +17,19 @@
 /////////////////////////////////
 
 #ifdef USELCD
-const int QR_X_OFFSET = 20;
-const int QR_Y_OFFSET = 3;
-const int QR_DOT_SIZE = 2;
+const uint32_t QR_X_OFFSET = 20;
+const uint32_t QR_Y_OFFSET = 3;
+const uint32_t QR_DOT_SIZE = 2;
+const uint32_t QR_VERSION = 11;
+const uint32_t QR_ECC = ECC_LOW;
 #endif
 
+const uint32_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnect interval (ms)
+
 /////////////////////////////////
 /////////////////////////////////
 /////////////////////////////////
 
-// Access point variables
 String payloadStr;
 String password;
 String serverFull;
@@ -38,13 +41,7 @@ String highPin;
 String timePin;
 String pinFlip = "true";
 String lnurl;
-String dataId;
 String payReq;
-
-int balance;
-int oldBalance;
-
-static const uint16_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnec interval
 
 bool paid = false;
 bool triggerUSB = false;
@@ -285,20 +282,21 @@ void readFiles()
   }
   
   void qrdisplayScreen()
-  {
-    String qrCodeData;
-    if(lnurl != "true"){
-      qrCodeData = lnurl;
+  { 
+    if(lnurl == "true") {
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(30, 60);
+      tft.setTextSize(2);
+      tft.setTextColor(TFT_RED);
+      tft.println("NO LNURL");
+      return;
     }
-    else{
-      qrCodeData = payReq;
-    }
+
+    lnurl.toUpperCase();
     tft.fillScreen(TFT_WHITE);
-    qrCodeData.toUpperCase();
-    const char *qrDataChar = qrCodeData.c_str();
     QRCode qrcoded;
-    uint8_t qrcodeData[qrcode_getBufferSize(11)];
-    qrcode_initText(&qrcoded, qrcodeData, 11, 0, qrDataChar);
+    uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
+    qrcode_initText(&qrcoded, qrcodeData, QR_VERSION, QR_ECC, lnurl.c_str());
     for (uint8_t y = 0; y < qrcoded.size; y++)
     {
       // Each horizontal module
@@ -320,7 +318,7 @@ void readFiles()
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_DISCONNECTED:
-            Serial.printf("[WSc] Disconnected!\n");
+            Serial.println(F("[WSc] Disconnected!"));
             break;
         case WStype_CONNECTED:
             {
