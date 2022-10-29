@@ -118,9 +118,9 @@ void loop() {
   }
 
   #ifdef USELCD
-    if((lnurl != "true") and (showqr == true)){
-        qrdisplayScreen();
-        showqr = false;
+    if(showqr == true){
+      qrdisplayScreen();
+      showqr = false;
     }
   #endif
   
@@ -281,8 +281,7 @@ void readFiles()
     tft.println("COMPLETE");
   }
   
-  void qrdisplayScreen()
-  { 
+  void qrdisplayScreen() { 
     if(lnurl == "true") {
       tft.fillScreen(TFT_BLACK);
       tft.setCursor(30, 60);
@@ -297,19 +296,16 @@ void readFiles()
     QRCode qrcoded;
     uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
     qrcode_initText(&qrcoded, qrcodeData, QR_VERSION, QR_ECC, lnurl.c_str());
-    for (uint8_t y = 0; y < qrcoded.size; y++)
-    {
+    uint16_t module_color;
+    for (uint8_t y = 0; y < qrcoded.size; y++) {
       // Each horizontal module
-      for (uint8_t x = 0; x < qrcoded.size; x++)
-      {
-        if (qrcode_getModule(&qrcoded, x, y))
-        {
-          tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_BLACK);
+      for (uint8_t x = 0; x < qrcoded.size; x++) {
+        if (qrcode_getModule(&qrcoded, x, y)) {
+          module_color = TFT_BLACK;
+        } else {
+          module_color = TFT_WHITE;
         }
-        else
-        {
-          tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, ST7735_WHITE);
-        }
+        tft.fillRect(QR_X_OFFSET + QR_DOT_SIZE * x, QR_Y_OFFSET + QR_DOT_SIZE * y, QR_DOT_SIZE, QR_DOT_SIZE, module_color);
       }
     }
   }
