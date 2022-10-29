@@ -25,6 +25,9 @@ const uint32_t QR_ECC = ECC_LOW;
 #endif
 
 const uint32_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnect interval (ms)
+const uint32_t WS_HB_PING_TIME = 20000;          // ping server every WS_HB_PING_TIME ms (set to 0 to disable heartbeat)
+const uint32_t WS_HB_PONG_WITHIN = 10000;        // expect pong from server within WS_HB_PONG_WITHIN ms
+const uint32_t WS_HB_PONGS_MISSED = 2;             // consider connection disconnected if pong is not received WS_HB_PONGS_MISSED times
 
 /////////////////////////////////
 /////////////////////////////////
@@ -106,6 +109,16 @@ void setup()
   webSocket.beginSSL(lnbitsServer.c_str(), 443, ("/lnurldevice/ws/" + deviceId).c_str());
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(WS_RECONNECT_INTERVAL);
+  if (WS_HB_PING_TIME != 0) {
+    Serial.print(F("Enabling WS heartbeat with ping time "));
+    Serial.print(WS_HB_PING_TIME);
+    Serial.print(F("ms, pong time "));
+    Serial.print(WS_HB_PONG_WITHIN);
+    Serial.print(F("ms, "));
+    Serial.print(WS_HB_PONGS_MISSED);
+    Serial.print(F(" missed pongs to reconnect."));
+    webSocket.enableHeartbeat(WS_HB_PING_TIME, WS_HB_PONG_WITHIN, WS_HB_PONGS_MISSED);
+  }
 }
 
 void loop() {
@@ -328,6 +341,15 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         case WStype_TEXT:
             payloadStr = (char*)payload;
             paid = true;
+            break;
+        case WStype_PING:
+            // pong will be send automatically
+            Serial.println("[WSc] ping received");
+            break;
+        case WStype_PONG:
+            // answer to a ping we send
+            Serial.println("[WSc] pong received");
+            break;    
     		case WStype_ERROR:			
     		case WStype_FRAGMENT_TEXT_START:
     		case WStype_FRAGMENT_BIN_START:
