@@ -44,7 +44,6 @@ String highPin;
 String timePin;
 String pinFlip = "true";
 String lnurl;
-String payReq;
 
 bool paid = false;
 bool triggerUSB = false;
@@ -67,10 +66,12 @@ void setup()
   Serial.println(F("\n\nBOOT!"));
   
   #ifdef USELCD
+    Serial.print(F("LCD init "));
     tft.init();
     tft.setRotation(3);
     tft.invertDisplay(false);
     logoScreen();
+    Serial.println(F("DONE!"));
   #endif
 
   //turn off onboard led (usually gpio 2)
@@ -195,41 +196,74 @@ String getValue(String data, char separator, int index)
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
-void readFiles()
-{
+bool readFiles() {        //true = success, false = fail
+  Serial.print(F("Opening config file... "));
   File paramFile = SPIFFS.open(PARAM_FILE, "r");
-  if (paramFile)
-  {
-    StaticJsonDocument<1500> doc;
-    DeserializationError error = deserializeJson(doc, paramFile.readString());
-
-    const JsonObject maRoot0 = doc[0];
-    const char *maRoot0Char = maRoot0["value"];
-    password = maRoot0Char;
-    Serial.println(password);
-
-    const JsonObject maRoot1 = doc[1];
-    const char *maRoot1Char = maRoot1["value"];
-    ssid = maRoot1Char;
-    Serial.println(ssid);
-
-    const JsonObject maRoot2 = doc[2];
-    const char *maRoot2Char = maRoot2["value"];
-    wifiPassword = maRoot2Char;
-    Serial.println(wifiPassword);
-
-    const JsonObject maRoot3 = doc[3];
-    const char *maRoot3Char = maRoot3["value"];
-    serverFull = maRoot3Char;
-    lnbitsServer = serverFull.substring(5, serverFull.length() - 38);
-    deviceId = serverFull.substring(serverFull.length() - 22);
-
-    const JsonObject maRoot4 = doc[4];
-    const char *maRoot4Char = maRoot4["value"];
-    lnurl = maRoot4Char;
-    Serial.println(lnurl);
+  if (!paramFile) {
+    Serial.println(F("NOT FOUND!"));
+    return false;
   }
+  Serial.println(F("DONE!"));
+
+  Serial.print(F("Parsing json config... "));
+  StaticJsonDocument<1500> doc;
+  DeserializationError error = deserializeJson(doc, paramFile);
+  if (error) {
+    Serial.println(F("ERROR!"));
+    return false;
+  }
+  Serial.println(F("DONE!"));
+
+  const JsonObject maRoot1 = doc[1];
+  const char *maRoot1Char = maRoot1["value"];
+  ssid = maRoot1Char;
+  if (ssid.length() == 0) {
+    Serial.println(F("Fatal: No SSID found in config!"));
+    return false;
+  }
+  Serial.print(F("SSID: "));
+  Serial.println(ssid);
+
+  const JsonObject maRoot2 = doc[2];
+  const char *maRoot2Char = maRoot2["value"];
+  wifiPassword = maRoot2Char;
+  Serial.print(F("WiFi password: "));
+  Serial.println(wifiPassword);
+
+  const JsonObject maRoot3 = doc[3];
+  const char *maRoot3Char = maRoot3["value"];
+  serverFull = maRoot3Char;
+  if (serverFull.length() == 0) {
+    Serial.println(F("Fatal: No websocket adddess found in config!"));
+    return false;
+  }
+  Serial.print(F("Websocket adddess: "));
+  Serial.println(serverFull);
+  
+  lnbitsServer = serverFull.substring(5, serverFull.length() - 38);
+  if (lnbitsServer.length() == 0) {
+    Serial.println(F("Fatal: Unable to get lnbits server address!"));
+    return false;
+  }
+  Serial.print(F("Server hostname: "));
+  Serial.println(lnbitsServer);
+  
+  deviceId = serverFull.substring(serverFull.length() - 22);
+  if (deviceId.length() == 0) {
+    Serial.println(F("Fatal: Unable to get deviceId!"));
+    return false;
+  }  
+  Serial.print(F("Device ID: "));
+  Serial.println(deviceId);
+
+  const JsonObject maRoot4 = doc[4];
+  const char *maRoot4Char = maRoot4["value"];
+  lnurl = maRoot4Char;
+  Serial.print(F("LNURL: "));
+  Serial.println(lnurl);
+  
   paramFile.close();
+  return true;
 }
 
 //////////////////DISPLAY///////////////////
