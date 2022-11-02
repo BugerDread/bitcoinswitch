@@ -21,11 +21,11 @@ const uint32_t QR_X_OFFSET = 20;
 const uint32_t QR_Y_OFFSET = 3;
 const uint32_t QR_DOT_SIZE = 2;
 const uint32_t QR_VERSION = 11;
-const uint32_t QR_ECC = ECC_LOW;
+const uint32_t QR_ECC = ECC_HIGH;   //LOW. MEDIUM, QUARTILE, HIGH
 #endif
 
-const uint32_t WS_RECONNECT_INTERVAL = 5000;  // websocket reconnect interval (ms)
-const uint32_t WS_HB_PING_TIME = 20000;          // ping server every WS_HB_PING_TIME ms (set to 0 to disable heartbeat)
+const uint32_t WS_RECONNECT_INTERVAL = 10000;  // websocket reconnect interval (ms)
+const uint32_t WS_HB_PING_TIME = 15000;          // ping server every WS_HB_PING_TIME ms (set to 0 to disable heartbeat)
 const uint32_t WS_HB_PONG_WITHIN = 10000;        // expect pong from server within WS_HB_PONG_WITHIN ms
 const uint32_t WS_HB_PONGS_MISSED = 2;             // consider connection disconnected if pong is not received WS_HB_PONGS_MISSED times
 
@@ -46,10 +46,12 @@ String pinFlip = "true";
 String lnurl;
 
 bool paid = false;
+bool connerr = true;
 bool triggerUSB = false;
 
 #ifdef USELCD 
   bool showqr = false;
+  bool showconnect = true;
   TFT_eSPI tft = TFT_eSPI();
 #endif
 
@@ -124,18 +126,15 @@ void setup()
 }
 
 void loop() {
-  while(WiFi.status() != WL_CONNECTED){
-    #ifdef USELCD
-      connectionError();
-    #endif
-    Serial.println("Failed to connect");
-    delay(500);
-  }
-
   #ifdef USELCD
-    if(showqr == true){
+    if ( showqr == true ) {
       qrdisplayScreen();
       showqr = false;
+    }
+
+    if ( showconnect == true ) {
+      connectScreen();
+      showconnect = false;
     }
   #endif
   
@@ -284,32 +283,14 @@ bool readFiles() {        //true = success, false = fail
     tft.println("POWERED BY LNBITS");
   }
   
-//  void serverError()
-//  {
-//    tft.fillScreen(TFT_WHITE);
-//    tft.setCursor(0, 80);
-//    tft.setTextSize(1);
-//    tft.setTextColor(TFT_RED);
-//    tft.println("Server connect fail");
-//  }
-//  
-  void connectionError()
+  void connectScreen()
   {
     tft.fillScreen(TFT_WHITE);
-    tft.setCursor(0, 80);
-    tft.setTextSize(1);
+    tft.setCursor(20, 60);
+    tft.setTextSize(2);
     tft.setTextColor(TFT_RED);
-    tft.println("Wifi connect fail");
+    tft.println("CONNECTING");
   }
-//  
-//  void connection()
-//  {
-//    tft.fillScreen(TFT_WHITE);
-//    tft.setCursor(0, 80);
-//    tft.setTextSize(1);
-//    tft.setTextColor(TFT_RED);
-//    tft.println("Wifi connected");
-//  }
   
   void paidScreen()
   { 
@@ -363,11 +344,14 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_DISCONNECTED:
             Serial.println(F("[WSc] Disconnected!"));
+            connerr = true;
+            showconnect = true;
             break;
         case WStype_CONNECTED:
             {
             Serial.printf("[WSc] Connected to url: %s\n",  payload);
 			      webSocket.sendTXT("Connected");
+            connerr = false;
             #ifdef USELCD
               showqr = true;
             #endif  
