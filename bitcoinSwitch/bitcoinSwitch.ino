@@ -80,7 +80,7 @@ void setup() {
         digitalWrite(LED_BUILTIN, LOW);
         //Serial.println(digitalRead(portalPin));
         if (!digitalRead(portalPin)) {
-            Serial.println(F("Configuration mode triggered"));
+            Serial.println(F("Configuration mode triggered by GPIO0"));
             triggerConfig = true;
             timer = 5000;
         }
@@ -97,7 +97,10 @@ void setup() {
         digitalWrite(LED_BUILTIN, LOW);
         configOverSerialPort();
     } else {
+        WiFi.persistent(false);   //reduces flash wear
         WiFi.begin((char*)ssid.c_str(), (char*)wifiPassword.c_str());
+        WiFi.setAutoReconnect(true);  //autoreconnect on
+
         Serial.print("Connecting to WiFi");
         while (WiFi.status() != WL_CONNECTED) {
             Serial.print(".");
@@ -125,47 +128,48 @@ void setup() {
 }
 
 void loop() {
-    while (WiFi.status() != WL_CONNECTED) { // check wifi again
-        Serial.println("Failed to connect");
+    if (WiFi.status() != WL_CONNECTED) { // check wifi again
+        Serial.println("WiFi connection failed, reconnecting");
         delay(500);
+        digitalWrite(LED_BUILTIN, LOW);   //LEDs on ESP8266 are active low
+        delay(500);
+        digitalWrite(LED_BUILTIN, HIGH);  //LEDs on ESP8266 are active low
+        return;
     }
-    digitalWrite(LED_BUILTIN, HIGH); //LEDs on ESP8266 are active low
-    payloadStr = "";
-    delay(2000);
-    while (paid == false) { // loop and wait for payment
-        webSocket.loop();
-        if (paid) {
-            if (thresholdAmount != 0) { // If in threshold mode we check the "balance" pushed by the websocket and use the pin/time preset
-                StaticJsonDocument<1900> doc;
-                DeserializationError error = deserializeJson(doc, payloadStr);
-                if (error) {
-                    Serial.print("deserializeJson() failed: ");
-                    Serial.println(error.c_str());
-                    return;
-                }
-                JsonObject payment = doc["payment"];
-                payment_amount = payment["amount"];
-                thresholdSum = thresholdSum + payment_amount;
-                Serial.println("thresholdSum: " + String(thresholdSum));
-                Serial.println("thresholdAmount: " + String((thresholdAmount * 1000)));
-                Serial.println("thresholdPin: " + String(thresholdPin));
-                if (thresholdSum >= (thresholdAmount * 1000)) {
-                    pinMode(thresholdPin, OUTPUT);
-                    digitalWrite(thresholdPin, HIGH);
-                    delay(thresholdTime);
-                    digitalWrite(thresholdPin, LOW);
-                    thresholdSum = 0;
-                }
-            } else { // If in normal mode we use the pin/time pushed by the websocket
-                pinMode(getValue(payloadStr, '-', 0).toInt(), OUTPUT);
-                digitalWrite(getValue(payloadStr, '-', 0).toInt(), HIGH);
-                delay(getValue(payloadStr, '-', 1).toInt());
-                digitalWrite(getValue(payloadStr, '-', 0).toInt(), LOW);
+
+    webSocket.loop();
+
+    if (paid) {
+        Serial.println("Paid");
+        paid = false;
+        if (thresholdAmount != 0) { // If in threshold mode we check the "balance" pushed by the websocket and use the pin/time preset
+            StaticJsonDocument<1900> doc;
+            DeserializationError error = deserializeJson(doc, payloadStr);
+            if (error) {
+                Serial.print("deserializeJson() failed: ");
+                Serial.println(error.c_str());
+                return;
             }
+            JsonObject payment = doc["payment"];
+            payment_amount = payment["amount"];
+            thresholdSum = thresholdSum + payment_amount;
+            Serial.println("thresholdSum: " + String(thresholdSum));
+            Serial.println("thresholdAmount: " + String((thresholdAmount * 1000)));
+            Serial.println("thresholdPin: " + String(thresholdPin));
+            if (thresholdSum >= (thresholdAmount * 1000)) {
+                pinMode(thresholdPin, OUTPUT);
+                digitalWrite(thresholdPin, HIGH);
+                delay(thresholdTime);
+                digitalWrite(thresholdPin, LOW);
+                thresholdSum = 0;
+            }
+        } else { // If in normal mode we use the pin/time pushed by the websocket
+            pinMode(getValue(payloadStr, '-', 0).toInt(), OUTPUT);
+            digitalWrite(getValue(payloadStr, '-', 0).toInt(), HIGH);
+            delay(getValue(payloadStr, '-', 1).toInt());
+            digitalWrite(getValue(payloadStr, '-', 0).toInt(), LOW);
         }
     }
-    Serial.println("Paid");
-    paid = false;
 }
 
 //////////////////HELPERS///////////////////
