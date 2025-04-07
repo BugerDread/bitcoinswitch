@@ -21,6 +21,12 @@ long thresholdTime; // Time to turn pin on, 'long thresholdTime = 2000;' / 'long
 //                                 END of variables                              //
 ///////////////////////////////////////////////////////////////////////////////////
 
+//ws reconnect params
+const uint32_t WS_RECONNECT_INTERVAL = 1000;     // websocket reconnect interval (ms)
+const uint32_t WS_HB_PING_TIME = 10000;          // ping server every WS_HB_PING_TIME ms (set to 0 to disable heartbeat)
+const uint32_t WS_HB_PONG_WITHIN = 9000;         // expect pong from server within WS_HB_PONG_WITHIN ms
+const uint32_t WS_HB_PONGS_MISSED = 2;           // consider connection lost if pong is not received WS_HB_PONGS_MISSED times
+
 //#include <WiFi.h>
 #include <ESP8266WiFi.h>
 #include <FS.h>
@@ -125,6 +131,16 @@ void setup() {
     }
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(1000);
+    if (WS_HB_PING_TIME != 0) {
+        Serial.print(F("Enabling WS heartbeat with ping time "));
+        Serial.print(WS_HB_PING_TIME);
+        Serial.print(F("ms, expecting pong within "));
+        Serial.print(WS_HB_PONG_WITHIN);
+        Serial.print(F("ms, "));
+        Serial.print(WS_HB_PONGS_MISSED);
+        Serial.println(F(" missed pongs to reconnect."));
+        webSocket.enableHeartbeat(WS_HB_PING_TIME, WS_HB_PONG_WITHIN, WS_HB_PONGS_MISSED);
+    }    
 }
 
 void loop() {
@@ -283,6 +299,12 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
             payloadStr.toLowerCase();
             Serial.println("Received data from socket: " + payloadStr);
             paid = true;
+        case WStype_PING:
+            Serial.println("[WSc] ping");
+            break;
+        case WStype_PONG:
+            Serial.println("[WSc] pong");
+            break;    
         case WStype_ERROR:
         case WStype_FRAGMENT_TEXT_START:
         case WStype_FRAGMENT_BIN_START:
