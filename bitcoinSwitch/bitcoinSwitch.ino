@@ -53,9 +53,9 @@ bool down = false;
 long thresholdSum = 0;
 long payment_amount = 0;
 
-// Serial config
+//other pin config
 const uint8_t portalPin = 0;  //most ESP8266 boards have "flash" switch on GPIO0, we can use that as 8266 does not supports touch
-
+const uint8_t readyPin = 15;  //WS ready LED
 WebSocketsClient webSocket;
 
 struct KeyValue {
@@ -69,8 +69,10 @@ void setup() {
     Serial.println(version);
     
     bool triggerConfig = false;
-    pinMode(LED_BUILTIN, OUTPUT); // To blink on board LED
-    digitalWrite(LED_BUILTIN, HIGH); //turn led off
+    pinMode(LED_BUILTIN, OUTPUT);     //init onboard LED
+    digitalWrite(LED_BUILTIN, HIGH);  //turn led off (active low)
+    pinMode(readyPin, OUTPUT);        //ws ready led init
+    digitalWrite(readyPin, LOW);      //we are not ready, turn it off (active high)
 
     //init SPIFFS
     Serial.println(F("SPIFFS init started"));
@@ -130,6 +132,7 @@ void setup() {
         Serial.println("Connecting to websocket: " + urlPrefix + lnbitsServer + apiUrl + deviceId);
         webSocket.beginSSL(lnbitsServer.c_str(), 443, (apiUrl + deviceId).c_str());
     }
+
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(1000);
     if (WS_HB_PING_TIME != 0) {
@@ -147,6 +150,7 @@ void setup() {
 void loop() {
     if (WiFi.status() != WL_CONNECTED) { // check wifi again
         Serial.println("WiFi connection failed, reconnecting");
+        digitalWrite(readyPin, LOW);    //we are not ready
         delay(500);
         digitalWrite(LED_BUILTIN, LOW);   //LEDs on ESP8266 are active low
         delay(500);
@@ -289,10 +293,12 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
     switch (type) {
         case WStype_DISCONNECTED:
             Serial.printf("[WSc] Disconnected!\n");
+            digitalWrite(readyPin, LOW);    //we are not ready
             break;
         case WStype_CONNECTED:
             Serial.printf("[WSc] Connected to url: %s\n", payload);
             webSocket.sendTXT("Connected"); // send message to server when Connected
+            digitalWrite(readyPin, HIGH);    //we are ready
             break;
         case WStype_TEXT:
             payloadStr = (char *)payload;
