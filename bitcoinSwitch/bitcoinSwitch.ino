@@ -54,7 +54,7 @@ long thresholdSum = 0;
 long payment_amount = 0;
 
 // Serial config
-int portalPin = 0;  //most ESP8266 boards have "flash" switch on GPIO0, we can use that as 8266 does not supports touch
+const uint8_t portalPin = 0;  //most ESP8266 boards have "flash" switch on GPIO0, we can use that as 8266 does not supports touch
 
 WebSocketsClient webSocket;
 
@@ -82,6 +82,7 @@ void setup() {
 
     //check cfg button
     int timer = 0;
+    pinMode(portalPin, INPUT_PULLUP);
     while (timer < 2000) {
         digitalWrite(LED_BUILTIN, LOW);
         //Serial.println(digitalRead(portalPin));
