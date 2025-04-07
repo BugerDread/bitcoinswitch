@@ -76,6 +76,7 @@ void setup() {
 
     //check cfg button
     int timer = 0;
+    pinMode(portalPin, INPUT_PULLUP);
     while (timer < 2000) {
         digitalWrite(LED_BUILTIN, LOW);
         //Serial.println(digitalRead(portalPin));
