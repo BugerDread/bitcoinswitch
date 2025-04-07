@@ -3,7 +3,7 @@
 //  form in the web-installer https://lnbits.github.io/bitcoinswitch/installer/  //
 ///////////////////////////////////////////////////////////////////////////////////
 
-String version = "0.1.1";
+String version = "8266.0.1";
 
 String ssid = "null"; // 'String ssid = "ssid";' / 'String ssid = "null";'
 String wifiPassword = "null"; // 'String wifiPassword = "password";' / 'String wifiPassword = "null";'
@@ -21,13 +21,13 @@ long thresholdTime; // Time to turn pin on, 'long thresholdTime = 2000;' / 'long
 //                                 END of variables                              //
 ///////////////////////////////////////////////////////////////////////////////////
 
-#include <WiFi.h>
+//#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include <FS.h>
-#include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
 
-fs::SPIFFSFS &FlashFS = SPIFFS;
+//fs::SPIFFSFS &FlashFS = SPIFFS;   //B dunno
 #define FORMAT_ON_FAIL true
 #define PARAM_FILE "/elements.json"
 
@@ -48,7 +48,7 @@ long thresholdSum = 0;
 long payment_amount = 0;
 
 // Serial config
-int portalPin = 4;
+int portalPin = 0;  //most ESP8266 boards have "flash" switch on GPIO0, we can use that as 8266 does not supports touch
 
 WebSocketsClient webSocket;
 
@@ -59,40 +59,53 @@ struct KeyValue {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("Welcome to BitcoinSwitch, running on version: " + version);
+    Serial.print(F("\n\n\nWelcome to BitcoinSwitch, running on version: "));
+    Serial.println(version);
+    
     bool triggerConfig = false;
-    pinMode(2, OUTPUT); // To blink on board LED
-    FlashFS.begin(FORMAT_ON_FAIL);
+    pinMode(LED_BUILTIN, OUTPUT); // To blink on board LED
+    digitalWrite(LED_BUILTIN, HIGH); //turn led off
+
+    //init SPIFFS
+    Serial.println(F("SPIFFS init started"));
+    SPIFFSConfig cfg;
+    cfg.setAutoFormat(FORMAT_ON_FAIL);
+    SPIFFS.setConfig(cfg);
+    SPIFFS.begin();
+    Serial.println(F("SPIFFS init done"));
+
+    //check cfg button
     int timer = 0;
     while (timer < 2000) {
-        digitalWrite(2, HIGH);
-        Serial.println(touchRead(portalPin));
-        if (touchRead(portalPin) < 60) {
+        digitalWrite(LED_BUILTIN, LOW);
+        //Serial.println(digitalRead(portalPin));
+        if (!digitalRead(portalPin)) {
+            Serial.println(F("Configuration mode triggered"));
             triggerConfig = true;
             timer = 5000;
         }
-
         timer = timer + 100;
         delay(150);
-        digitalWrite(2, LOW);
+        digitalWrite(LED_BUILTIN, HIGH);
         delay(150);
     }
 
     readFiles(); // get the saved details and store in global variables
 
     if (triggerConfig == true || ssid == "" || ssid == "null") {
-        Serial.println("Launch serial config");
+        Serial.println(F("Launch serial config"));
+        digitalWrite(LED_BUILTIN, LOW);
         configOverSerialPort();
     } else {
-        WiFi.begin(ssid.c_str(), wifiPassword.c_str());
+        WiFi.begin((char*)ssid.c_str(), (char*)wifiPassword.c_str());
         Serial.print("Connecting to WiFi");
         while (WiFi.status() != WL_CONNECTED) {
             Serial.print(".");
             delay(500);
-            digitalWrite(2, HIGH);
+            digitalWrite(LED_BUILTIN, LOW);   //LEDs on ESP8266 are active low
             Serial.print(".");
             delay(500);
-            digitalWrite(2, LOW);
+            digitalWrite(LED_BUILTIN, HIGH);  //LEDs on ESP8266 are active low
         }
     }
 
@@ -100,12 +113,12 @@ void setup() {
         Serial.println("");
         Serial.println("Using THRESHOLD mode");
         Serial.println("Connecting to websocket: " + urlPrefix + lnbitsServer + apiUrl + thresholdInkey);
-        webSocket.beginSSL(lnbitsServer, 443, apiUrl + thresholdInkey);
+        webSocket.beginSSL(lnbitsServer.c_str(), 443, (apiUrl + thresholdInkey).c_str());
     } else { // Use in normal mode
         Serial.println("");
         Serial.println("Using NORMAL mode");
         Serial.println("Connecting to websocket: " + urlPrefix + lnbitsServer + apiUrl + deviceId);
-        webSocket.beginSSL(lnbitsServer, 443, apiUrl + deviceId);
+        webSocket.beginSSL(lnbitsServer.c_str(), 443, (apiUrl + deviceId).c_str());
     }
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(1000);
@@ -116,7 +129,7 @@ void loop() {
         Serial.println("Failed to connect");
         delay(500);
     }
-    digitalWrite(2, LOW);
+    digitalWrite(LED_BUILTIN, HIGH); //LEDs on ESP8266 are active low
     payloadStr = "";
     delay(2000);
     while (paid == false) { // loop and wait for payment
@@ -182,7 +195,7 @@ String getJsonValue(JsonDocument &doc, const char *name) {
 }
 
 void readFiles() {
-    File paramFile = FlashFS.open(PARAM_FILE, "r");
+    File paramFile = SPIFFS.open(PARAM_FILE, "r");
     if (paramFile) {
         StaticJsonDocument<2500> doc;
         DeserializationError error = deserializeJson(doc, paramFile.readString());
@@ -221,29 +234,31 @@ void readFiles() {
             Serial.println("switchStr hardcoded");
             Serial.println("switchStr: " + switchStr);
         }
-
-        int protocolIndex = switchStr.indexOf("://");
-        if (protocolIndex == -1) {
-            Serial.println("Invalid switchStr: " + switchStr);
-            return;
-        }
-        urlPrefix = switchStr.substring(0, protocolIndex + 3);
-
-        int domainIndex = switchStr.indexOf("/", protocolIndex + 3);
-        if (domainIndex == -1) {
-            Serial.println("Invalid switchStr: " + switchStr);
-            return;
-        }
-
-        lnbitsServer = switchStr.substring(protocolIndex + 3, domainIndex);
-        apiUrl = switchStr.substring(domainIndex, switchStr.length() - uidLength);
-        deviceId = switchStr.substring(switchStr.length() - uidLength);
-
-        Serial.println("LNbits ws prefix: " + urlPrefix);
-        Serial.println("LNbits server: " + lnbitsServer);
-        Serial.println("LNbits API url: " + apiUrl);
-        Serial.println("Switch device ID: " + deviceId);
     }
+
+    //this needs to be out of the if (paramfile) condition otherwise hardcoded parameters wount work
+    int protocolIndex = switchStr.indexOf("://");
+    if (protocolIndex == -1) {
+        Serial.println("Invalid switchStr: " + switchStr);
+        return;
+    }
+    urlPrefix = switchStr.substring(0, protocolIndex + 3);
+
+    int domainIndex = switchStr.indexOf("/", protocolIndex + 3);
+    if (domainIndex == -1) {
+        Serial.println("Invalid switchStr: " + switchStr);
+        return;
+    }
+
+    lnbitsServer = switchStr.substring(protocolIndex + 3, domainIndex);
+    apiUrl = switchStr.substring(domainIndex, switchStr.length() - uidLength);
+    deviceId = switchStr.substring(switchStr.length() - uidLength);
+
+    Serial.println("LNbits ws prefix: " + urlPrefix);
+    Serial.println("LNbits server: " + lnbitsServer);
+    Serial.println("LNbits API url: " + apiUrl);
+    Serial.println("Switch device ID: " + deviceId);
+    
     paramFile.close();
 }
 
